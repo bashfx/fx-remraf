@@ -310,10 +310,10 @@ print_line(){ printf -v v "%-*s" "$2" ""; echo "${v// /$1}"; }
     local count data b=$blue g=$green o=$white w=$wz u=$grey
     data+=""
     data="$(cat <<-EOF
-      \n${LINE}
-      \n\t${b}remraf <command> --option:opt_arg ${x}
-      ${LINE}\n
-    EOF
+			\n${LINE}
+			\n\t${b}remraf <command> --option:opt_arg ${x}
+			${LINE}\n
+		EOF
     )";
     printf "$data";
     return 0;
@@ -346,13 +346,13 @@ print_line(){ printf -v v "%-*s" "$2" ""; echo "${v// /$1}"; }
     timestamp=$(date "+%a %F %I:%M %p");
     data+=""
     data="$(cat <<-EOF
-      #!/usr/bin/env bash
-      # remraf install generated config file $timestamp 
-        BASH_PROFILE="$BASH_PROFILE"
-        LAST_BASH_PROFILE="$LAST_BASH_PROFILE"
-        REMRAF_OPT_MARKER='.remraf'
-        REMRAF_OPT_SAFE_MODE=$REMRAF_OPT_SAFE_MODE;
-    EOF
+		  #!/usr/bin/env bash
+		  # remraf install generated config file $timestamp 
+		    BASH_PROFILE="$BASH_PROFILE"
+		    LAST_BASH_PROFILE="$LAST_BASH_PROFILE"
+		    REMRAF_OPT_MARKER='.remraf'
+		    REMRAF_OPT_SAFE_MODE=$REMRAF_OPT_SAFE_MODE;
+		EOF
     )";
     echo "$data"
   }
