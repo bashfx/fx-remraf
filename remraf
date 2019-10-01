@@ -242,22 +242,21 @@
 			\t    to default <${b} rm -I ${x}>
 
 			\t  ${r}FUCKIT Mode:${x}
-			\t    Runs remraf (rm -rf) an all specified dirs/files.
+			\t    Runs remraf <${b} rm -rf ${x}> an all specified dirs/files.
 
 
 			\t${w}Options:${x}
 
-			\t  ${o}-S${x}        ${u}Enable safe mode.${x}
-			\t  ${o}-X${x}        ${u}Enable fuckit mode.${x}
-			\t  ${o}-r${x}        ${u}Recursive (directories)${x}
-			\t  ${o}-rf${x}       ${u}Remraf${x}
-
+			\t  ${b}-S${x}        ${u}Enable safe mode.${x}
+			\t  ${b}-X${x}        ${u}Enable fuckit mode.${x}
+			\t  ${b}-r${x}        ${u}Recursive (directories)${x}
+			\t  ${b}-rf${x}       ${u}Remraf${x}
 
 			\t${w}Commands:${x}
 
-			\t  ${o}--trash${x}   ${u}Empty Trashbin${x}
-			\t  ${o}--gen${x}     ${u}(DEV) Generate test structure.${x}
-			\t  ${o}--here${x}    ${u}(DEV) Generate in current directory.${x}
+			\t  ${b}--trash${x}   ${u}Empty Trashbin${x}
+			\t  ${b}--gen${x}     ${u}(DEV) Generate test structure.${x}
+			\t  ${b}--here${x}    ${u}(DEV) Generate in current directory.${x}
 
 
 			${nl}${line}${nl}
