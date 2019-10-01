@@ -1,0 +1,77 @@
+.TH REMRAF 1 "22 March 2019" "1.0" "REMRAF - Extended RM wrapper utility"
+.SH NAME
+.B remraf
+
+.SH SYNOPSIS
+.B remraf 
+[\fIGROUP\fR] [\fIFLAGS\fR...] [\fICOMMANDS\fR...]
+
+.B remraf
+[\fB\-d\fR]
+[\fB\-\-debug\fR]
+[\fB\-h\fR]
+[\fB\-\-help\fR]
+[\fB\-n\fR \fIFILENAME\fR]
+[\fB\-\-name\fR \fIFILENAME\fR]
+[\fB\-s\fR \fISECTION\fR]
+[\fB\-\-section\fR \fISECTION\fR]
+
+
+.SH DESCRIPTION
+remraf ..
+
+.SH OPTIONS
+
+.TP
+.BR \-d ", " \-\-debug
+Output additional debug information for testing 
+
+.TP
+.BR \-h ", " \-\-help
+Get usage information
+
+.TP
+.BR \-g ", " \-\-group \fIGROUP\fR
+Set the output filename to be compiled
+A filename option is required to use the nameflag.
+
+.TP
+.BR \-a ", " \-\-add \fIKEY\fR=\fIVALUE\fR
+Key to add to the current group
+
+.TP
+.BR \-r ", " \-\-remove \fIKEY\fR
+Key to delete from the current group
+
+.SH EXAMPLES
+Use envdb 
+.BR envdb (1)
+command:
+.PP
+.NF
+.RS
+.B remraf ./conf/setup.conf -u -s color  -n color
+.RE
+.FI
+
+Use remraf to 
+.BR remraf (1)
+command:
+.PP
+.NF
+.RS
+.B envdb ./conf/install.conf -u -s symbol -n sym
+.I ./tmp/sym-09011.conf
+.RE
+.FI
+
+.PP
+Nifty, huh?
+
+
+.SH SEE ALSO
+bashfx(1)
+.SH BUGS
+No known bugs. Experimental REMRAF for Bash
+.SH AUTHOR
+Qodeninja <\fIqodeninja@outlook.com\fR> or <\fI@qodeninja\fR> on Twitter
