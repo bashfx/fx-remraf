@@ -1,339 +1,253 @@
 #!/usr/bin/env bash
 #===============================================================================
 #-------------------------------------------------------------------------------
-#$ name:remraf|rm
-#$ author:qodeninja
-#$ autobuild: 00003
-#$ date:
+
+ 
+
 #-------------------------------------------------------------------------------
 #=====================================code!=====================================
 
-  readonly T=0 F=1;
+	readonly T=0 F=1;
 
-  script_id="fx:remraf"
+	script_id="fx:remraf"
 
-  [ -f "$HOME/.profile" ] && BASH_PROFILE="$HOME/.profile" || BASH_PROFILE="$HOME/.bash_profile"
-  [ -L "$BASH_PROFILE"  ] && LAST_BASH_PROFILE="$BASH_PROFILE" && BASH_PROFILE=$(realpath $BASH_PROFILE) || :
-
-  REMRAF_TEMP="/tmp/remraf";
-  REMRAF_SESSION="$(date +%s)"
-
-  REMRAF_RC="$HOME/.rmrc"
-  REMRAF_OPT_MARKER='.remraf';
-  REMRAF_OPT_TARGET="$BASH_PROFILE";
-  REMRAF_OPT_SAFE_MODE=1;
-
-  base_path=$(dirname ${BASH_SOURCE[0]}); #BSD?
-  do_inst=1;
-
-  #use with autorun/dirdif 
-  autorun(){
-    touch "$HOME/wksp/.autorun" &> /dev/null; 
-    touch "$REMRAF_TEMP/trash/.autorun" &> /dev/null; 
-  }
+	[ -f "$HOME/.profile" ] && BASH_PROFILE="$HOME/.profile" || BASH_PROFILE="$HOME/.bash_profile"
+	[ -L "$BASH_PROFILE"  ] && LAST_BASH_PROFILE="$BASH_PROFILE" && BASH_PROFILE=$(realpath $BASH_PROFILE) || :
 
 
-  trap autorun EXIT
+#-------------------------------------------------------------------------------
+# CONFIGURABLE VARS
+#-------------------------------------------------------------------------------
+
+	REMRAF_TEMP="/tmp/remraf";
+	REMRAF_SESSION="$(date +%s)"
+
+	REMRAF_RC="$HOME/.rmrc"
+	REMRAF_OPT_MARKER='.remraf';
+	REMRAF_OPT_TARGET="$BASH_PROFILE";
+	REMRAF_OPT_SAFE_MODE=1;
+
+  THIS_BAK_DIR=
+
+#-------------------------------------------------------------------------------
+# AUTOMATED VARS
+#-------------------------------------------------------------------------------
+
+	base_path=$(dirname ${BASH_SOURCE[0]}); #BSD?
+	do_inst=1;
+  c=0;
+
+  raf_count=0;
+  not_count=0;
+  file_count=0;
+
+	trap autorun EXIT
 
 #-------------------------------------------------------------------------------
 # BUFFERS (GLOBAL ARRAYS)
 #-------------------------------------------------------------------------------
 
-  _opts=();
-  _args=();
+	_opts=();
+	_args=();
 
-  _buf=();
-  _raf=();
-  _not=();
-  _file=();
+	_buf=();
+	_raf=();
+	_not=();
+	_file=();
+  _unk=();
 
 #-------------------------------------------------------------------------------
 # TERM
 #-------------------------------------------------------------------------------
 
-  red=$(tput setaf 9)
-  green=$(tput setaf 2)
-  blue=$(tput setaf 12);
-  yellow=$(tput setaf 11)
-  orange=$(tput setaf 214)
-  grey=$(tput setaf 244)
-  purple=$(tput setaf 213);
-  pink=$(tput setaf 169);
-  white=$(tput setaf 15)
-  wz=$(tput setaf 248)
-  x=$(tput sgr0);
-  eol=$(tput el);
+	red=$(tput setaf 9)
+	green=$(tput setaf 2)
+	blue=$(tput setaf 12);
+	yellow=$(tput setaf 11)
+	orange=$(tput setaf 214)
+	grey=$(tput setaf 244)
+	purple=$(tput setaf 213);
+	pink=$(tput setaf 169);
+	white=$(tput setaf 15)
+	wz=$(tput setaf 248)
+	x=$(tput sgr0);
+	eol=$(tput el);
 
-  idelta='\xE2\x96\xB3';
-  ipass='\xE2\x9C\x93'; #'\Uf42e'; # "\xE2\x9C\x93";
-  ifail='\xE2\x9C\x97';
-  ilambda='\xCE\xBB';
-  idots='\xE2\x80\xA6'
-  istar='\xE2\x98\x85'; #★ printf ★ | hexdump
-  ilock='\xEF\xA1\x80';
+	idelta='\xE2\x96\xB3';
+	ipass='\xE2\x9C\x93'; #'\Uf42e'; # "\xE2\x9C\x93";
+	ifail='\xE2\x9C\x97';
+	ilambda='\xCE\xBB';
+	idots='\xE2\x80\xA6'
+	istar='\xE2\x98\x85'; #★ printf ★ | hexdump
+	ilock='\xEF\xA1\x80';
 
-  tab=$'\t'
-  nl=$'\n'
-  rl=$'\r';
-  sp=$'  ';
+	tab=$'\t'
+	nl=$'\n'
+	rl=$'\r';
+	sp=$'  ';
 
 #-------------------------------------------------------------------------------
 # EARLY-OPTIONS
 #-------------------------------------------------------------------------------
-  opt_recursive=1;
-  opt_log_color=0;
+	opt_recursive=1;
+	opt_log_color=0;
 
 
-  [[ "${@}" =~ --?(y|yes)   ]]; opt_yes=$?;
-  [[ "${@}" =~ --?(X|fuck*) ]]; opt_fukit=$?;
-  [[ "${@}" =~ --?(S|safe*) ]]; opt_safe=$?; REMRAF_OPT_SAFE_MODE=$opt_safe;
-  [[ "${@}" =~ --?(Q|quiet) ]]; opt_quiet=$?;
-  [[ "${@}" =~ --?(v|verb*) ]]; opt_debug=$?;
+	[[ "${@}" =~ --?(y|yes)   ]]; opt_yes=$?;
+	[[ "${@}" =~ --?(X|fuck*) ]]; opt_fukit=$?;
+	[[ "${@}" =~ --?(S|safe*) ]]; opt_safe=$?; REMRAF_OPT_SAFE_MODE=$opt_safe;
+	[[ "${@}" =~ --?(Q|quiet) ]]; opt_quiet=$?;
+	[[ "${@}" =~ --?(v|verb*) ]]; opt_debug=$?;
 
 
-  [[ "${@}" =~ --here ]]; opt_here=$?;
+	[[ "${@}" =~ --here ]]; opt_here=$?;
 
-  [[ "${@}" =~ --uninst*    ]]; opt_uninstall=$?;
+	[[ "${@}" =~ --uninst*    ]]; opt_uninstall=$?;
 
 #-------------------------------------------------------------------------------
 # DEBUG OPTIONS
 #-------------------------------------------------------------------------------
 
-  [[ "${@}" =~ --?(d|debug)[=:]([0-9]+) ]]; opt_debug=$?;
+	[[ "${@}" =~ --?(d|debug)[=:]([0-9]+) ]]; opt_debug=$?;
 
-  opt_log_level="${BASH_REMATCH[2]:-3}";
+	opt_log_level="${BASH_REMATCH[2]:-3}";
 
 #-------------------------------------------------------------------------------
 # PRINT
 #-------------------------------------------------------------------------------
 
   stderr(){ printf -- "${@}" 1>&2; }
-  nprint(){ [ $opt_quiet -eq 1 ] && printf "%s%b%s" "${!2:-}" "${1:-}" 1>&2; } ## 2 color is deref
- nlprint(){ [ $opt_quiet -eq 1 ] && printf "%s%b%s" "${!2:-}" "${1:-}" "$nl" 1>&2; }
-
- rands(){ local i=${1:-16}; < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-$i};echo; }
- randi(){ local i=${1:-16}; < /dev/urandom tr -dc 0-9 | head -c${1:-$i};echo; } 
-
-print_line(){ printf -v v "%-*s" "$2" ""; echo "${v// /$1}"; }
+  nprint(){  [ $opt_quiet -eq 1 ] && printf "%s%b%s" "${!2:-}" "${1:-}" 1>&2; } ## 2 color is deref
+  nlprint(){ [ $opt_quiet -eq 1 ] && printf "%s%b%s" "${!2:-}" "${1:-}" "$nl" 1>&2; }
+  print_line(){ printf -v v "%-*s" "$2" ""; echo "${v// /$1}"; }
 
   log_n(){ :
-    ## 1 log_level
-    local color txt pre lvl=${1:-1};
-
-    if [ $lvl -le $opt_log_level ]; then
-      ## 2 log_color
-      [ $opt_log_color -eq $T  ] && color="${!2}" || color=''
-      ## 3 log_preamble
-
-      [ ! -z "$3" ] && pre="${!3}" || pre=''
-      ## 4 log_message
-      txt="${4:-}";
-      [ ! -z "$txt" ] && nlprint "$color${pre}$txt${x}"; # printf "${color}${pre}$txt${x}\n"
-    else
-      #[ $opt_dev -eq 0 ] && nlprint "${idots}log ($lvl) surpressed${x}" "grey" #printf "${grey}${idots}log ($lvl) surpressed${x}\n"
-      :
-    fi
-
+  	## 1 log_level
+  	local color txt pre lvl=${1:-1};
+  	if [ $lvl -le $opt_log_level ]; then
+  		## 2 log_color
+  		[ $opt_log_color -eq $T  ] && color="${!2}" || color=''
+  		## 3 log_preamble
+  		[ ! -z "$3" ] && pre="${!3}" || pre=''
+  		## 4 log_message
+  		txt="${4:-}";
+  		[ ! -z "$txt" ] && nlprint "$color${pre}$txt${x}"; # printf "${color}${pre}$txt${x}\n"
+  	else
+  		:
+  	fi
   }
 
-
- log_error(){ log_n 1 "red"    "ifail"   " $1"; }
-  log_pass(){ log_n 2 "green"  "ipass"   " $1"; }
-  log_warn(){ log_n 2 "orange" "idelta"  "$1";  }
-  log_info(){ log_n 3 "blue"   "ilambda" "$1";  }
- log_silly(){ log_n 4 "purple" "istar"   " $1"; }
+  log_error(){ log_n 1 "red"    "ifail"   " $1"; }
+  log_pass(){  log_n 2 "green"  "ipass"   " $1"; }
+  log_warn(){  log_n 2 "orange" "idelta"  "$1";  }
+  log_info(){  log_n 3 "blue"   "ilambda" "$1";  }
+  log_silly(){ log_n 4 "purple" "istar"   " $1"; }
 
 
 #-------------------------------------------------------------------------------
 # USER INPUT
 #-------------------------------------------------------------------------------
 
-  confirm(){
-    local src ret cont=1 auto=${2:-0} y=$opt_yes bg="${bld}${green}" br="${bld}${red}" ret=1
-    nprint "${rl}${1}? > " "white2"
+	confirm(){
+		local src ret cont=1 auto=${2:-0} y=$opt_yes bg="${bld}${green}" br="${bld}${red}" ret=1
+		nprint "${rl}${1}? > " "white2"
 
-    [[ "$auto" = "c" ]] && { auto=0; cont=0; } #continue with enter
+		[[ "$auto" = "c" ]] && { auto=0; cont=0; } #continue with enter
 
-    [ $y -eq 0 -a $auto -eq 1 ] && nlprint "${br}auto no${x}\n" && return 1;
-    [ $y -eq 0 ] && nlprint "${bg}auto yes${x}\n" && return 0;
+		[ $y -eq 0 -a $auto -eq 1 ] && nlprint "${br}auto no${x}\n" && return 1;
+		[ $y -eq 0 ] && nlprint "${bg}auto yes${x}\n" && return 0;
 
-    [[ -f ${BASH_SOURCE} ]] && src='/dev/stdin' || src='/dev/tty' #how does this work for pipe
+		[[ -f ${BASH_SOURCE} ]] && src='/dev/stdin' || src='/dev/tty' #how does this work for pipe
 
-    while read -n 1 -s INPUT < $src; do
-      [ ${#INPUT} -eq 0 -a $cont -eq 0 ] && nprint "${bg}yes${x}" && return 0 || :
-      [ $? -eq 1 ] && stderr "Error occured?" && exit 1;
-      if [[ $INPUT = [YyNn10tf+\-q] ]]; then
-        [[ $INPUT = [Yyt1+] ]] && nprint "${bg}yes${x}" && ret=0 || :
-        [[ $INPUT = [Nnf0\-] ]] && nprint "${br}no${x}" && ret=1 || :
-        [[ $INPUT = [q] ]] && stderr "\n" && exit 1 || :
-        break
-      fi
-    done
-    stderr " ${nl}${x}"
-    return $ret
-  }
+		while read -n 1 -s INPUT < $src; do
+			[ ${#INPUT} -eq 0 -a $cont -eq 0 ] && nprint "${bg}yes${x}" && return 0 || :
+			[ $? -eq 1 ] && stderr "Error occured?" && exit 1;
+			if [[ $INPUT = [YyNn10tf+\-q] ]]; then
+				[[ $INPUT = [Yyt1+] ]] && nprint "${bg}yes${x}" && ret=0 || :
+				[[ $INPUT = [Nnf0\-] ]] && nprint "${br}no${x}" && ret=1 || :
+				[[ $INPUT = [q] ]] && stderr "\n" && exit 1 || :
+				break
+			fi
+		done
+		stderr " ${nl}${x}"
+		return $ret
+	}
 
 
-  print_array(){
-    local i this arr=("${@}") len=${#arr[@]}
-    if [ $len -gt 0 ]; then
-      for i in ${!arr[@]}; do
-        this="${arr[$i]}"
-        nlprint "$i:$this"
-      done
-    fi
-  }
+	print_array(){
+		local i this arr=("${@}") len=${#arr[@]}
+		if [ $len -gt 0 ]; then
+			for i in ${!arr[@]}; do
+				this="${arr[$i]}"
+				nlprint "$i:$this"
+			done
+		fi
+	}
+
 
 #-------------------------------------------------------------------------------
-# GENERATOR
+# Trash
 #-------------------------------------------------------------------------------
-  ## var bin etc xxx impl www
-  generate_test_files(){
-    local i r q len d path max _dirs=(pics fun downloads code xxx impl)
-    local _subdirs=( lvl1 lvl2 lvl3 lvl4 lvl5 )
 
-    local line="$(print_line '-' 50)";
-
-    for d in ${_dirs[@]}; do
-
-      [ $opt_here -eq 1 ] && path="$HOME/wksp/$d";
-      [ $opt_here -eq 0 ] && path="$PWD/$d";
-
-      mkdir -p "$path" &> /dev/null;
-
-      stderr "$nl$line$nl"
-      stderr "Dir [ ${pink} ${d} ${x} ] ${x}${nl}";
-
-      #make .remraf
-      ((r=RANDOM%2))
-      if [ $r -eq 0 ]; then
-        touch "$path/$REMRAF_OPT_MARKER" &> /dev/null;
-        stderr "[ ${green} RIMRAFFED!  ${x} ] ${x}${nl}";
-      fi
-
-      #make subpaths
-      [ $opt_here -eq 0 ] && max=2 || max=4;
-      ((r=RANDOM%max))
-
-      for i in $(seq 0 $r); do
-
-        [ $opt_here -eq 0 ] && max=2 || max=5;
-        ((q=RANDOM%max))
-        subpath=
-
-        log_info "Random $q $max"
-
-        for j in $(seq 0 $q); do
-          ((n=RANDOM%999))
-          subdir=${_subdirs[$j]};
-          [ $j -eq 0 ] && subpath+="${subdir}.r${n}/" || :;
-          [ $j -gt 1 ] && subpath+="${subdir}/"       || :;
-        done
-
-        
-        stderr "└Subpath [ ${pink} ${subdir} ${x} ] ($subpath) ${x}${nl}";
-        mkdir -p "$path/$subpath" &> /dev/null;
-
-        #make subpath text file
-        ((b=RANDOM%2))
-        if [ $b -eq 0 ]; then
-
-          [ $opt_here -eq 0 ] && max=1 || max=3;
-          ((t=RANDOM%max))
-
-          for j in $(seq 0 $t); do
-            ((u=RANDOM%999))
-            touch "$path/$subpath/text${u}";
-            stderr "   └Text file [ ${orange} text${u} ${x} ] to ($subdir) ${x}${nl}";
-          done
-        fi
+	empty_trash(){
+		local ret trash_dir="$REMRAF_TEMP/trash";
+		if confirm "${red}${ilock} Are you SURE you want to permanantly dump trash? (y/n)"; then
+			trash_dir=$(abs $trash_dir);
+			find "$trash_dir/" -mindepth 1 -type d -print0 | xargs -r0 -- rm -rf;
+		fi
+		return $ret;
+	}
 
 
-      done
-
-
-      # ((r=RANDOM%4))
-      # for i in $(seq 0 $r); do
-      #   ((q=RANDOM%99))
-      #   touch "$path/hello${q}" &> /dev/null;
-      #   log_info "Touch $i of $r in ($d)";
-      # done
-
-    done
-
-
-    ((r=RANDOM%4))
-    for i in $(seq 0 $r); do
-      ((q=RANDOM%99))
-      touch "$HOME/wksp/hello${q}" &> /dev/null;
-      stderr "Touch [ ${orange} hello${q} ${x} ] $i of $r$nl";
-    done
-
-  }
-
-  empty_trash(){
-    local ret trash_dir="$REMRAF_TEMP/trash";
-
-    if confirm "${red}${ilock} Are you SURE you want to permanantly dump trash? (y/n)"; then
-      trash_dir=$(abs $trash_dir);
-      #\rm -rf "$trash_dir/{*,.*}"; ret=$?
-
-      #for i in "$trash_dir/*"; do echo "$i$nl"; done
-
-      find "$trash_dir/" -mindepth 1 -type d -print0 | xargs -r0 -- rm -rf;
-
-      log_info "Did rm pass? ($ret)";
-    else
-      :
-    fi
-
-    return $ret;
-  }
-
-
-  tree_test(){
-    ls -R | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/ /' -e 's/-/|/'
-  }
 #-------------------------------------------------------------------------------
 # INSTALL
 #-------------------------------------------------------------------------------
 
 #install:st
-  source "$base_path/remraf.d/remraf.setup.sh";
+	source "$base_path/remraf.d/remraf.setup.sh";
 #install:end
+
+#-------------------------------------------------------------------------------
+# GENERATOR
+#-------------------------------------------------------------------------------
+
+#generator:st
+  source "$base_path/remraf.d/remraf.gen.sh";
+#generator:end
+
 
 #-------------------------------------------------------------------------------
 # USAGE
 #-------------------------------------------------------------------------------
 
-  usage(){
-    local count data b=$blue g=$green o=$white w=$wz u=$grey
-    data+=""
-    data="$(cat <<-EOF
+	usage(){
+		local count data b=$blue g=$green o=$white w=$wz u=$grey
+		data+=""
+		data="$(cat <<-EOF
 			\n${LINE}
 			\n\t${b}remraf <command> --option:opt_arg ${x}
 			${LINE}\n
 		EOF
-    )";
-    printf "$data";
-    return 0;
-  }
+		)";
+		printf "$data";
+		return 0;
+	}
 
 #-------------------------------------------------------------------------------
 # UTILS
 #-------------------------------------------------------------------------------
 
 
-  abs(){ printf $(realpath $1); }  
+	abs(){ printf $(realpath $1); }  
 
-  find_rimraf(){
-    local len ret path="$1"
-    _buf=($(find "$path" -maxdepth 1 -type f -name "$REMRAF_OPT_MARKER" ! -path .));
-    len=${#_buf[@]};
-    #print_array "${_buf[@]}"
-    [ $len -gt 0 ] && ret=0 || ret=1;
-    return $ret;
-  }
+	find_rimraf(){
+		local len ret path="$1"
+		_buf=($(find "$path" -maxdepth 1 -type f -name "$REMRAF_OPT_MARKER" ! -path .));
+		len=${#_buf[@]};
+		#print_array "${_buf[@]}"
+		[ $len -gt 0 ] && ret=0 || ret=1;
+		return $ret;
+	}
 
 
 #-------------------------------------------------------------------------------
@@ -341,217 +255,198 @@ print_line(){ printf -v v "%-*s" "$2" ""; echo "${v// /$1}"; }
 #-------------------------------------------------------------------------------
 
 
-  rc_file_str(){
-    local data timestamp line="$(print_line '#' 15)";
-    timestamp=$(date "+%a %F %I:%M %p");
-    data+=""
-    data="$(cat <<-EOF
-		  #!/usr/bin/env bash
-		  # remraf install generated config file $timestamp 
-		    BASH_PROFILE="$BASH_PROFILE"
-		    LAST_BASH_PROFILE="$LAST_BASH_PROFILE"
-		    REMRAF_OPT_MARKER='.remraf'
-		    REMRAF_OPT_SAFE_MODE=$REMRAF_OPT_SAFE_MODE;
+	rc_file_str(){
+		local data timestamp line="$(print_line '#' 15)";
+		timestamp=$(date "+%a %F %I:%M %p");
+		data+=""
+		data="$(cat <<-EOF
+			#!/usr/bin/env bash
+			# remraf install generated config file $timestamp 
+				BASH_PROFILE="$BASH_PROFILE"
+				LAST_BASH_PROFILE="$LAST_BASH_PROFILE"
+				REMRAF_OPT_MARKER='.remraf'
+				REMRAF_OPT_SAFE_MODE=$REMRAF_OPT_SAFE_MODE;
 		EOF
-    )";
-    echo "$data"
-  }
+		)";
+		echo "$data"
+	}
 
 
-  rc_make(){
-    local show src="${1:-$REMRAF_RC}" rc_str;
-    if [ -n $src ]; then
-      rc_str="$(rc_file_str)";
-      echo -e "$rc_str" > ${src};
-    fi
-    [ -f "${src}" ] && return 0 || return 1;
-  }
+	rc_make(){
+		local show src="${1:-$REMRAF_RC}" rc_str;
+		if [ -n $src ]; then
+			rc_str="$(rc_file_str)";
+			echo -e "$rc_str" > ${src};
+		fi
+		[ -f "${src}" ] && return 0 || return 1;
+	}
 
 
 #-------------------------------------------------------------------------------
 # OPTIONS
 #-------------------------------------------------------------------------------
 
-
-  options(){
-    local i;
-    for i; do
-      case "$i" in
-        --gen)   : 
-          generate_test_files;
-        ;;
-        --trash) :
-          empty_trash;
-        ;;
-        -[^-]*)  : 
-          log_silly "option $i"
-          [[ "${@}" =~ -rf ]] && opt_recursive=0 && log_silly "remraf $i"   || :;
-          [[ "${@}" =~ -r  ]] && opt_recursive=0 && log_silly "recurse me $i" || :;
-          _opts+=($i)
-        ;;
-        *)   : 
-          log_silly "arg $i";
-          _args+=($i)
-        ;;        
-      esac
-    done
-
-    [ ${#__opts[@]} -gt 0 ] && rc_make;
-  }
+	options(){
+		local i;
+		for i; do
+			case "$i" in
+				--gen)   generate_test_files;;
+				--trash) empty_trash;;
+				-[^-]*)  : 
+					log_silly "option $i"
+					[[ "${@}" =~ -rf ]] && opt_recursive=0 || :;
+					[[ "${@}" =~ -r  ]] && opt_recursive=0 || :;
+					_opts+=($i)
+				;;
+				*)   : 
+					log_silly "arg $i";
+					_args+=($i)
+				;;        
+			esac
+		done
+    [ ${#_args[@]} -eq 0 ] && exit 1; #exit if no args
+		[ ${#_opts[@]} -gt 0 ] && rc_make;
+	}
 
 
-  remraf_sort(){
-    local i a;
-    for i; do
-      [ -L "$i" ] && {
-        _file+=($i);
-      } || 
-      [ -d "$i" ] && {
-        #log_info "Directory $i";  
+	remraf_sort(){
+		local i a;
+		for i; do
+			[ -L "$i" ] && { _file+=($i); }   || 
+			[ -d "$i" ] && { 
         a=$(abs $i);  
-        find_rimraf "$a"; ret=$?;
-        [ $ret -eq 0 ] && _raf+=($i) || _not+=($i);
-      }  || {
-        [ -f "$i" ] && _file+=($i) || :; ## && log_pass "File ($i)" || :; #log_warn "Not a dir ($i)";
-      }
+				find_rimraf "$a"; ret=$?;
+				[ $ret -eq 0 ] && _raf+=($i)    || _not+=($i);
+			} || 
+      { [ -f "$i" ] && { _file+=($i); } || _unk+=($i); }  ## && log_pass "File ($i)" || :; #log_warn "Not a dir ($i)";
+		done
+    raf_count=${#_raf[@]};
+    not_count=${#_not[@]};
+    file_count=${#_file[@]}; 
+    unk_count=${#_unk[@]}; 
+    log_info "sort (raf:$raf_count) (not:$not_count) (file:$file_count)"
+	}
+
+
+#-------------------------------------------------------------------------------
+# RECYCLE
+#-------------------------------------------------------------------------------
+  
+  make_bak(){
+    mkdir -p "$bak_dir" &> /dev/null;
+    touch "$bak_dir/$REMRAF_OPT_MARKER"
+    echo "$PWD" >> "$bak_dir/$REMRAF_OPT_MARKER";
+  }
+
+  next_bak(){
+    local bak_dir postfix;
+    postfix="$(randi 5)";
+    printf -v postfix "%05s" "$postfix";
+    bak_dir="$REMRAF_TEMP/trash/bak.$postfix"; #only create bakup if using bakup for moving
+    echo "$bak_dir";
+  }
+
+  req_recursive(){
+    local fx="$1" pre="$2" ret=0;
+    if [ $opt_recursive -eq 0 ]; then 
+      $fx;return $ret;
+    else
+      len="${pre}_count"; len=${!len};
+      [ $len -gt 0 ] && err="Remraf directory requires recursive flag";
+      log_info "${pre}_count $len"
+    fi
+  }
+
+  recycle(){
+    local target bak_dir="${1:-$THIS_BAK_DIR}";
+    [ ! -d $bak_dir ] && make_bak;
+    for i in ${_buf[@]}; do
+      [ -d "$i" ] && { printf -v target "%s" "$bak_dir";    };
+      [ -f "$i" ] && { printf -v target "%s" "$bak_dir/$i"; }; 
+      stderr "${orange}Moving ($i) to trashbin ($bak_dir) ${x}$nl";
+      \mv "$i" "$target"  &> /dev/null;
+      ((c+=1))
+    done    
+  }
+
+  recycle_dir(){  _buf=(${_not[*]});  recycle; return $?; }
+  recycle_file(){ _buf=(${_file[*]}); recycle; return $?; }
+
+
+  remraf_dir(){
+    local bak_dir="${1:-$THIS_BAK_DIR}";
+    for d in ${_raf[@]}; do
+      stderr "${orange}Deleting remrafd directory ($d)! ${x}$nl";
+      \rm -r "$d" &> /dev/null; 
+      ((c+=1))
     done
   }
+
+
+  fuckit(){
+    _buf=($(echo ${_not[*]} ${_raf[*]} ${_file[*]}));
+    if [ ${#_buf[@]} -gt 0 ]; then
+      stderr "${red}${ilock}FUCKIT MODE ENABLED!!! (${_buf[*]})${x}${nl}"; 
+      if confirm "${red}Are you SURE you want to send these items to hell (y/n)"; then
+        for d in ${_buf[@]}; do
+          stderr "${red}${ilock}Deleted... $(abs $d)$nl"
+          \rm -rf "$d" &> /dev/null;
+          ((c+=1))
+        done
+      else
+        stderr "Remraf cancelled";
+        exit 0;
+      fi
+    fi
+  }
+
+
+
 
 
 #-------------------------------------------------------------------------------
 # REMRAF
 #-------------------------------------------------------------------------------
 
+	remraf(){
+		local bak_dir d IFS ret=0
+		[ $opt_uninstall -eq 0 ] && { remraf_uninstall;ret=$?; exit $ret; }
+		if check_setup; then
+			options "${@}";
+			if [ $do_inst -eq 1 ]; then
+				remraf_sort "${_args[@]}";
+        [ $opt_fukit -eq 0 ] && { fuckit; } || {
+          THIS_BAK_DIR=$(next_bak);
+          if ! req_recursive 'recycle_dir' 'not'; then ret=1; fi
+          recycle_file; #normal files only get move protectio
+        };
+        #remraf could be wrapped with an option
+        if ! req_recursive 'remraf_dir' 'raf'; then ret=1; fi
+				[ $c -eq 0 ] && out="${red}No rimraffable items found!${x}$nl" ||:;
+        IFS=',';
+        [ $unk_count -gt 0 ] && err="remraf: cannot remove \"${_unk[*]}\": No such file or directory" && ret=1;
+				out="${blue}${istar}remraf:($c) [ ${_opts[*]} ] [ ${_args[*]} ] [ ${_unk[*]} ] ${x}$nl";
+			fi
+		else
+			err="Check install failed...";
+		fi
 
-  make_bak(){
-    local bak_dir postfix;
-
-    postfix="$(randi 5)";
-    printf -v postfix "%05d" "$postfix";
-
-    #only create bakup if using bakup for moving
-    bak_dir="$REMRAF_TEMP/trash/bak.$postfix"; ##$$
-    mkdir -p "$bak_dir" &> /dev/null;
-
-    touch "$bak_dir/$REMRAF_OPT_MARKER"
-    echo "$PWD" >> "$bak_dir/$REMRAF_OPT_MARKER";
-
-    echo "$bak_dir";
-  }
-
-
-
-  remraf(){
-    local bak_dir d ret=0 c=0
-
-    if [ $opt_uninstall -eq 0 ]; then
-      remraf_uninstall;ret=$?;
-      exit $ret;
-    fi
-
-    if check_setup; then
-
-      options "${@}";ret=$?;
-
-      if [ $do_inst -eq 1 ]; then
-
-        [ ${#_args[@]} -eq 0 ] && exit 1;
-
-
-        remraf_sort "${_args[@]}";
-        #print_array "${_raf[@]}";
-
-
-        if [ $opt_fukit -eq 0 ]; then
-
-            _buf=($(echo ${_not[*]} ${_raf[*]} ${_file[*]}));
-
-
-            if [ ${#_buf[@]} -gt 0 ]; then
-
-              stderr "${red}${ilock}FUCKIT MODE ENABLED!!! (${_buf[*]})${x}${nl}"; 
-
-              ## ${nl}${red}${ilock}FUCKIT MODE ENABLED!${nl}Rimraf:(${_buf[*]})${nl}
-
-              if confirm "[$PWD] ${red}Are you SURE you want to send these items to hell (y/n)"; then
-                #print_array "${_buf[@]}";
-                for d in ${_buf[@]}; do
-                  stderr "${red}${ilock}Deleted... $(abs $d)$nl"
-                  \rm -rf "$d" &> /dev/null;
-                  ((c+=1))
-                done
-              else
-                stderr "Remraf cancelled";
-                exit 0;
-              fi
-            fi
-
-        else
-
-          ## < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;
-          
-          bak_dir=$(make_bak);
-
-
-          #normal dirs without .remraf
-          if [ $opt_recursive -eq 0 ]; then
-            for d in ${_not[@]}; do
-              stderr "${orange}Moving ($d) to trashbin ($bak_dir) ${x}$nl";
-              \mv "$d" "$bak_dir/" &> /dev/null;
-              ((c+=1))
-            done
-          else
-            [ ${#_not[@]} -gt 0 ] && err="Remraf directory needs recursive flag" || :;
-            ret=1;
-          fi    
-
-          #normal files only get move protection
-          for f in ${_file[@]}; do
-            stderr "${orange}Moving ($f) to trashbin ($bak_dir) ${x}$nl";
-            \mv "$f" "$bak_dir/$f" &> /dev/null;
-            ((c+=1))
-          done    
-
-        fi
-
-
-
-        if [ $opt_recursive -eq 0 ]; then
-          for d in ${_raf[@]}; do
-            stderr "${orange}Deleting rimrafd directory ($d)! ${x}$nl";
-            \rm -r "$d" &> /dev/null; 
-            ((c+=1))
-          done
-        else
-          [ ${#_raf[@]} -gt 0 ] && err="Remraf directory needs recursive flag!" || :;
-          ret=1;
-        fi
-          
-        [ $c -eq 0 ] && out="${red}No rimraffable items found!${x}$nl" ||:;
-
-        #print_array "${_not[@]}";
-        stderr "${blue}${istar}remraf:($c) [ ${_opts[*]} ] [ ${_args[*]} ] ${x}$nl";
-      fi
-    else
-      stderr "${red}Check install failed...${x}";
-    fi
-
-    return $ret;
-  }
+		return $ret;
+	}
 
 #-------------------------------------------------------------------------------
 # MAIN
 #-------------------------------------------------------------------------------
-  
-  main(){
-    local ret;
-    remraf "$@";ret=$?
-    [ -n "$err" ] && stderr "${red}$err" || stderr "$out";
-    unset out err;
-    return $ret
-  }
+	
+	main(){
+		local ret;
+		remraf "$@";ret=$?
+		[ -n "$err" ] && stderr "${red}$err" || stderr "$out";
+		unset out err;
+		return $ret
+	}
 
-  main "${@}";
+	main "${@}";
 
 #-------------------------------------------------------------------------------
 #=====================================!code=====================================
